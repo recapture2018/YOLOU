@@ -99,9 +99,7 @@ LOGGER = logging.getLogger("yolov5")  # define globally (used in train.py, val.p
 
 
 def user_config_dir(dir='Ultralytics', env_var='YOLOV5_CONFIG_DIR'):
-    # Return path of user configuration directory. Prefer environment variable if exists. Make dir if required.
-    env = os.getenv(env_var)
-    if env:
+    if env := os.getenv(env_var):
         path = Path(env)  # use environment variable
     else:
         cfg = {'Windows': 'AppData/Roaming', 'Linux': '.config', 'Darwin': 'Library/Application Support'}  # 3 OS dirs
@@ -207,7 +205,13 @@ def init_seeds(seed=0):
 
 def intersect_dicts(da, db, exclude=()):
     # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using da values
-    return {k: v for k, v in da.items() if k in db and not any(x in k for x in exclude) and v.shape == db[k].shape}
+    return {
+        k: v
+        for k, v in da.items()
+        if k in db
+        and all(x not in k for x in exclude)
+        and v.shape == db[k].shape
+    }
 
 
 def get_latest_run(search_dir='.'):
@@ -442,7 +446,7 @@ def check_font(font=FONT, progress=False):
     font = Path(font)
     file = CONFIG_DIR / font.name
     if not font.exists() and not file.exists():
-        url = "https://ultralytics.com/assets/" + font.name
+        url = f"https://ultralytics.com/assets/{font.name}"
         LOGGER.info(f'Downloading {url} to {file}...')
         torch.hub.download_url_to_file(url, str(file), progress=progress)
 
@@ -456,19 +460,19 @@ def check_dataset(data, autodownload=True):
         download(data, dir=DATASETS_DIR, unzip=True, delete=False, curl=False, threads=1)
         data = next((DATASETS_DIR / Path(data).stem).rglob('*.yaml'))
         extract_dir, autodownload = data.parent, False
-        
+
     # Read yaml (optional)
     if isinstance(data, (str, Path)):
         with open(data, errors='ignore') as f:
             data = yaml.safe_load(f)  # dictionary
-            
+
     # Checks
     for k in 'train', 'val', 'nc':
         assert k in data, emojis(f"data.yaml '{k}:' field missing ❌")
     if 'names' not in data:
         LOGGER.warning(emojis("data.yaml 'names:' field missing ⚠, assigning default names 'class0', 'class1', etc."))
         data['names'] = [f'class{i}' for i in range(data['nc'])]  # default names
-        
+
     # Resolve paths
     path = Path(extract_dir or data.get('path') or '')  # optional 'path' default to '.'
     if not path.is_absolute():
@@ -476,7 +480,7 @@ def check_dataset(data, autodownload=True):
     for k in 'train', 'val', 'test':
         if data.get(k):  # prepend path
             data[k] = str(path / data[k]) if isinstance(data[k], str) else [str(path / x) for x in data[k]]
-            
+
     # Parse yaml
     train, val, test, s = (data.get(x) for x in ('train', 'val', 'test', 'download'))
     if val:
@@ -484,27 +488,25 @@ def check_dataset(data, autodownload=True):
         if not all(x.exists() for x in val):
             LOGGER.info('\nDataset not found ⚠,missing paths: %s' % [str(x) for x in val if not x.exists()])
             t = time.time()
-            if s and autodownload:  # download script
-                
-                root = path.parent if 'path' in data else '..'  # unzip directory i.e. '../'
-                if s.startswith('http') and s.endswith('.zip'):  # URL
-                    f = Path(s).name  # filename
-                    LOGGER.info(f'Downloading {s} to {f}...')
-                    torch.hub.download_url_to_file(s, f)
-                    Path(root).mkdir(parents=True, exist_ok=True)  # create root
-                    ZipFile(f).extractall(path=root)  # unzip
-                    Path(f).unlink()  # remove zip
-                    r = None  # success
-                elif s.startswith('bash '):  # bash script
-                    LOGGER.info(f'Running {s} ...')
-                    r = os.system(s)
-                else:  # python script
-                    r = exec(s, {'yaml': data})  # return None
-                dt = f'({round(time.time() - t, 1)}s)'    
-                s = f"success ✅ {dt}, saved to {colorstr('bold', root)}" if r in (0, None) else f"failure {dt} ❌"
-                LOGGER.info(emojis(f"Dataset download {s}"))
-            else:
+            if not s or not autodownload:
                 raise Exception('Dataset not found ❌❌❌❌.')
+            root = path.parent if 'path' in data else '..'  # unzip directory i.e. '../'
+            if s.startswith('http') and s.endswith('.zip'):  # URL
+                f = Path(s).name  # filename
+                LOGGER.info(f'Downloading {s} to {f}...')
+                torch.hub.download_url_to_file(s, f)
+                Path(root).mkdir(parents=True, exist_ok=True)  # create root
+                ZipFile(f).extractall(path=root)  # unzip
+                Path(f).unlink()  # remove zip
+                r = None  # success
+            elif s.startswith('bash '):  # bash script
+                LOGGER.info(f'Running {s} ...')
+                r = os.system(s)
+            else:  # python script
+                r = exec(s, {'yaml': data})  # return None
+            dt = f'({round(time.time() - t, 1)}s)'
+            s = f"success ✅ {dt}, saved to {colorstr('bold', root)}" if r in (0, None) else f"failure {dt} ❌"
+            LOGGER.info(emojis(f"Dataset download {s}"))
     check_font('Arial.ttf' if is_ascii(data['names']) else 'Arial.Unicode.ttf', progress=True)  # download fonts
     return data  # dictionary
 

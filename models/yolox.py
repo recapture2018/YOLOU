@@ -37,7 +37,7 @@ class DetectX(nn.Module):
         self.reg_preds = nn.ModuleList()
         self.obj_preds = nn.ModuleList()
 
-        cls_in_channels = in_channels[0::2]
+        cls_in_channels = in_channels[::2]
         reg_in_channels = in_channels[1::2]
         for cls_in_channel, reg_in_channel in zip(cls_in_channels, reg_in_channels):
             cls_pred = nn.Conv2d(in_channels=cls_in_channel,
@@ -101,7 +101,7 @@ class DetectX(nn.Module):
         expanded_strides = []
         center_ltrbes = []
 
-        cls_xs = xin[0::2]
+        cls_xs = xin[::2]
         reg_xs = xin[1::2]
         in_type = xin[0].type()
         h, w = reg_xs[0].shape[2:4]
@@ -134,40 +134,36 @@ class DetectX(nn.Module):
                 output = torch.cat([reg_output, obj_output.sigmoid(), cls_output.sigmoid()], 1)
                 outputs.append(output)
 
-        if self.training:
-            bbox_preds = torch.cat(bbox_preds, 1)
-            obj_preds = torch.cat(obj_preds, 1)
-            cls_preds = torch.cat(cls_preds, 1)
-
-            org_xy_shifts = torch.cat(org_xy_shifts, 1)
-            xy_shifts = torch.cat(xy_shifts, 1)
-            expanded_strides = torch.cat(expanded_strides, 1)
-            center_ltrbes = torch.cat(center_ltrbes, 1)
-
-            if self.use_l1:
-                origin_preds = torch.cat(origin_preds, 1)
-            else:
-                origin_preds = bbox_preds.new_zeros(1)
-
-            whwh = torch.Tensor([[w, h, w, h]]).type_as(bbox_preds)
-            return (bbox_preds, cls_preds, obj_preds, origin_preds, org_xy_shifts, xy_shifts, expanded_strides, center_ltrbes, whwh,)
-        else:
+        if not self.training:
             return outputs
+        bbox_preds = torch.cat(bbox_preds, 1)
+        obj_preds = torch.cat(obj_preds, 1)
+        cls_preds = torch.cat(cls_preds, 1)
+
+        org_xy_shifts = torch.cat(org_xy_shifts, 1)
+        xy_shifts = torch.cat(xy_shifts, 1)
+        expanded_strides = torch.cat(expanded_strides, 1)
+        center_ltrbes = torch.cat(center_ltrbes, 1)
+
+        origin_preds = (
+            torch.cat(origin_preds, 1) if self.use_l1 else bbox_preds.new_zeros(1)
+        )
+        whwh = torch.Tensor([[w, h, w, h]]).type_as(bbox_preds)
+        return (bbox_preds, cls_preds, obj_preds, origin_preds, org_xy_shifts, xy_shifts, expanded_strides, center_ltrbes, whwh,)
 
     def forward(self, x):
         outputs = self._forward(x)
 
         if self.training:
             return outputs
-        else:
-            self.hw = [out.shape[-2:] for out in outputs]
-            # [batch, n_anchors_all, 85]
-            out = torch.cat([out.flatten(start_dim=2) for out in outputs], dim=2).permute(0, 2, 1)
-            out = self.decode_outputs(out, dtype=x[0].type())  # torch.Size([32, 5733, 6])
-            return (out,)
+        self.hw = [out.shape[-2:] for out in outputs]
+        # [batch, n_anchors_all, 85]
+        out = torch.cat([out.flatten(start_dim=2) for out in outputs], dim=2).permute(0, 2, 1)
+        out = self.decode_outputs(out, dtype=x[0].type())  # torch.Size([32, 5733, 6])
+        return (out,)
 
     def forward_export(self, x):
-        cls_xs = x[0::2]
+        cls_xs = x[::2]
         reg_xs = x[1::2]
         outputs = []
         for k, (stride_this_level, cls_x, reg_x) in enumerate(zip(self.stride, cls_xs, reg_xs)):
