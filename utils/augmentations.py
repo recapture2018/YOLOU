@@ -172,15 +172,7 @@ def random_perspective(im,
         else:  # affine
             im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
 
-    # Visualize
-    # import matplotlib.pyplot as plt
-    # ax = plt.subplots(1, 2, figsize=(12, 6))[1].ravel()
-    # ax[0].imshow(im[:, :, ::-1])  # base
-    # ax[1].imshow(im2[:, :, ::-1])  # warped
-
-    # Transform label coordinates
-    n = len(targets)
-    if n:
+    if n := len(targets):
         use_segments = any(x.any() for x in segments)
         new = np.zeros((n, 4))
         if use_segments:  # warp segments
@@ -316,13 +308,9 @@ def pastein(image, labels, sample_labels, sample_images, sample_masks):
         ymin = max(0, random.randint(0, h) - mask_h // 2)
         xmax = min(w, xmin + mask_w)
         ymax = min(h, ymin + mask_h)   
-        
+
         box = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
-        if len(labels):
-            ioa = bbox_ioa(box, labels[:, 1:5])  # intersection over area     
-        else:
-            ioa = np.zeros(1)
-        
+        ioa = bbox_ioa(box, labels[:, 1:5]) if len(labels) else np.zeros(1)
         if (ioa < 0.30).all() and len(sample_labels) and (xmax > xmin+20) and (ymax > ymin+20):  # allow 30% obscuration of existing labels
             sel_ind = random.randint(0, len(sample_labels)-1)
             #print(len(sample_labels))
@@ -335,7 +323,7 @@ def pastein(image, labels, sample_labels, sample_images, sample_masks):
             r_scale = min((ymax-ymin)/hs, (xmax-xmin)/ws)
             r_w = int(ws*r_scale)
             r_h = int(hs*r_scale)
-            
+
             if (r_w > 10) and (r_h > 10):
                 r_mask = cv2.resize(sample_masks[sel_ind], (r_w, r_h))
                 r_image = cv2.resize(sample_images[sel_ind], (r_w, r_h))
@@ -351,7 +339,7 @@ def pastein(image, labels, sample_labels, sample_images, sample_masks):
                         labels = np.concatenate((labels, [[sample_labels[sel_ind], *box]]), 0)
                     else:
                         labels = np.array([[sample_labels[sel_ind], *box]])
-                              
+
                     image[ymin:ymin+r_h, xmin:xmin+r_w] = temp_crop
 
     return labels

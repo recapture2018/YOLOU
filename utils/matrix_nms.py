@@ -81,9 +81,7 @@ def _matrix_nms(bboxes, cate_labels, cate_scores, kernel='gaussian', sigma=2.0):
     else:
         raise NotImplementedError
 
-    # 更新分数
-    cate_scores_update = cate_scores * decay_coefficient
-    return cate_scores_update
+    return cate_scores * decay_coefficient
 
 
 def matrix_nms(bboxes, scores, score_threshold, post_threshold, nms_top_k, keep_top_k, use_gaussian=False, gaussian_sigma=2.):
@@ -126,6 +124,4 @@ def matrix_nms(bboxes, scores, score_threshold, post_threshold, nms_top_k, keep_
 
     cate_scores = cate_scores.unsqueeze(1)
     cate_labels = cate_labels.unsqueeze(1).float()
-    pred = torch.cat([cate_labels, cate_scores, bboxes], 1)
-
-    return pred
+    return torch.cat([cate_labels, cate_scores, bboxes], 1)

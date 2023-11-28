@@ -94,8 +94,7 @@ class DecoupledHead(nn.Module):
         x2 = self.reg_convs2(x2)
         x21 = self.reg_preds(x2)
         x22 = self.obj_preds(x2)
-        out = torch.cat([x21, x22, x1], 1)
-        return out
+        return torch.cat([x21, x22, x1], 1)
 
 
 class DetectMultiBackend(nn.Module):
@@ -1100,11 +1099,17 @@ class Detections:
     def tolist(self):
         # return a list of Detections objects, i.e. 'for result in results.tolist():'
         r = range(self.n)  # iterable
-        x = [Detections([self.imgs[i]], [self.pred[i]], [self.files[i]], self.times, self.names, self.s) for i in r]
-        # for d in x:
-        #    for k in ['imgs', 'pred', 'xyxy', 'xyxyn', 'xywh', 'xywhn']:
-        #        setattr(d, k, getattr(d, k)[0])  # pop out of list
-        return x
+        return [
+            Detections(
+                [self.imgs[i]],
+                [self.pred[i]],
+                [self.files[i]],
+                self.times,
+                self.names,
+                self.s,
+            )
+            for i in r
+        ]
 
     def __len__(self):
         return self.n
@@ -1175,7 +1180,7 @@ class ASFFV5(nn.Module):
             compress_c * 3, 3, 1, 1)
         self.vis = vis
 
-    def forward(self, x):  # l,m,s
+    def forward(self, x):    # l,m,s
         """
         # 128, 256, 512
         512, 256, 128
@@ -1223,15 +1228,12 @@ class ASFFV5(nn.Module):
         levels_weight = F.softmax(levels_weight, dim=1)
 
         fused_out_reduced = level_0_resized * levels_weight[:, 0:1, :, :] + \
-                            level_1_resized * levels_weight[:, 1:2, :, :] + \
-                            level_2_resized * levels_weight[:, 2:, :, :]
+                                level_1_resized * levels_weight[:, 1:2, :, :] + \
+                                level_2_resized * levels_weight[:, 2:, :, :]
 
         out = self.expand(fused_out_reduced)
 
-        if self.vis:
-            return out, levels_weight, fused_out_reduced.sum(dim=1)
-        else:
-            return out
+        return (out, levels_weight, fused_out_reduced.sum(dim=1)) if self.vis else out
 
 
 class ChannelAttentionModule(nn.Module):
@@ -1370,9 +1372,7 @@ class CoordAtt(nn.Module):
         a_h = self.conv_h(x_h).sigmoid()
         a_w = self.conv_w(x_w).sigmoid()
 
-        out = identity * a_w * a_h
-
-        return out
+        return identity * a_w * a_h
 
 
 class MHSA(nn.Module):
@@ -1450,14 +1450,7 @@ class BottleneckTransformer(nn.Module):
         self.fc1 = nn.Linear(c2, c2)
 
     def forward(self, x):
-        # print("transforme  input bottleck shape:",x.shape)
-        # out = F.relu(self.bn1(self.conv1(x)))
-        # out = F.relu(self.bn2(self.conv2(out)))
-        # out = self.bn3(self.conv3(out))
-        # out += self.shortcut(x)
-        # out = F.relu(out)
-        out = x + self.cv2(self.cv1(x)) if self.shortcut else self.cv2(self.cv1(x))
-        return out
+        return x + self.cv2(self.cv1(x)) if self.shortcut else self.cv2(self.cv1(x))
 
 
 class CTR3(nn.Module):
@@ -1513,9 +1506,7 @@ class GAM_Attention(nn.Module):
 
         x_spatial_att = self.spatial_attention(x).sigmoid()
         x_spatial_att = channel_shuffle(x_spatial_att, 4)  # last shuffle
-        out = x * x_spatial_att
-        # out=channel_shuffle(out,4) #last shuffle
-        return out
+        return x * x_spatial_att
 
 
 def drop_path_f(x, drop_prob: float = 0., training: bool = False):
@@ -1532,8 +1523,7 @@ def drop_path_f(x, drop_prob: float = 0., training: bool = False):
     shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
     random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
     random_tensor.floor_()  # binarize
-    output = x.div(keep_prob) * random_tensor
-    return output
+    return x.div(keep_prob) * random_tensor
 
 
 class DropPath(nn.Module):
@@ -1559,10 +1549,11 @@ def window_partition(x, window_size: int):
     """
     B, H, W, C = x.shape
     x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
-    # permute: [B, H//Mh, Mh, W//Mw, Mw, C] -> [B, H//Mh, W//Mh, Mw, Mw, C]
-    # view: [B, H//Mh, W//Mw, Mh, Mw, C] -> [B*num_windows, Mh, Mw, C]
-    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
-    return windows
+    return (
+        x.permute(0, 1, 3, 2, 4, 5)
+        .contiguous()
+        .view(-1, window_size, window_size, C)
+    )
 
 
 def window_reverse(windows, window_size: int, H: int, W: int):
@@ -1647,10 +1638,7 @@ class PatchEmbed(nn.Module):
         self.tokens = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
 
         # LayerNorm
-        if norm_layer is not None:
-            self.norm = norm_layer(embed_dim)
-        else:
-            self.norm = None
+        self.norm = norm_layer(embed_dim) if norm_layer is not None else None
         self.pos_drop = nn.Dropout(p=0.)
 
     def forward(self, x):
@@ -1912,7 +1900,7 @@ class WindowAttention(nn.Module):
         # [batch_size*num_windows, num_heads, Mh*Mw, embed_dim_per_head]
         q, k, v = qkv.unbind(0)  # make torchscript happy (cannot use tensor as tuple)
         attn = torch.einsum("bhqd, bhkd -> bhqk", q, k) \
-               / torch.maximum(torch.norm(q, dim=-1, keepdim=True)
+                   / torch.maximum(torch.norm(q, dim=-1, keepdim=True)
                                * torch.norm(k, dim=-1, keepdim=True).transpose(-2, -1),
                                torch.tensor(1e-06, device=q.device, dtype=q.dtype))
         # transpose: -> [batch_size*num_windows, num_heads, embed_dim_per_head, Mh*Mw]
@@ -1944,10 +1932,7 @@ class WindowAttention(nn.Module):
             # mask.unsqueeze: [1, nW, 1, Mh*Mw, Mh*Mw]
             attn = attn.view(B_ // nW, nW, self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
             attn = attn.view(-1, self.num_heads, N, N)
-            attn = self.softmax(attn)
-        else:
-            attn = self.softmax(attn)
-
+        attn = self.softmax(attn)
         attn = self.attn_drop(attn)
 
         # @: multiply -> [batch_size*num_windows, num_heads, Mh*Mw, embed_dim_per_head]
@@ -2323,7 +2308,9 @@ class SwinTransformer_Layer(nn.Module):
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)  # [nW, Mh*Mw]
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)  # [nW, 1, Mh*Mw] - [nW, Mh*Mw, 1]
         # [nW, Mh*Mw, Mh*Mw]
-        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, -100.0).masked_fill(
+            attn_mask == 0, 0.0
+        )
         return attn_mask
 
     def forward(self, x):
@@ -2400,11 +2387,7 @@ class RepConv(nn.Module):
         if hasattr(self, "rbr_reparam"):
             return self.act(self.rbr_reparam(inputs))
 
-        if self.rbr_identity is None:
-            id_out = 0
-        else:
-            id_out = self.rbr_identity(inputs)
-
+        id_out = 0 if self.rbr_identity is None else self.rbr_identity(inputs)
         return self.act(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out)
 
     def get_equivalent_kernel_bias(self):
@@ -2417,10 +2400,7 @@ class RepConv(nn.Module):
         )
 
     def _pad_1x1_to_3x3_tensor(self, kernel1x1):
-        if kernel1x1 is None:
-            return 0
-        else:
-            return nn.functional.pad(kernel1x1, [1, 1, 1, 1])
+        return 0 if kernel1x1 is None else nn.functional.pad(kernel1x1, [1, 1, 1, 1])
 
     def _fuse_bn_tensor(self, branch):
         if branch is None:
@@ -2485,7 +2465,7 @@ class RepConv(nn.Module):
     def fuse_repvgg_block(self):
         if self.deploy:
             return
-        print(f"RepConv.fuse_repvgg_block")
+        print("RepConv.fuse_repvgg_block")
 
         self.rbr_dense = self.fuse_conv_bn(self.rbr_dense[0], self.rbr_dense[1])
 
@@ -2494,8 +2474,9 @@ class RepConv(nn.Module):
         weight_1x1_expanded = torch.nn.functional.pad(self.rbr_1x1.weight, [1, 1, 1, 1])
 
         # Fuse self.rbr_identity
-        if (isinstance(self.rbr_identity, nn.BatchNorm2d) or isinstance(self.rbr_identity,
-                                                                        nn.modules.batchnorm.SyncBatchNorm)):
+        if isinstance(
+            self.rbr_identity, (nn.BatchNorm2d, nn.modules.batchnorm.SyncBatchNorm)
+        ):
             # print(f"fuse: rbr_identity == BatchNorm2d or SyncBatchNorm")
             identity_conv_1x1 = nn.Conv2d(
                 in_channels=self.in_channels,
@@ -2727,10 +2708,7 @@ class ConvBN(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size,
                  stride=1, padding=0, dilation=1, groups=1, deploy=False, nonlinear=None):
         super().__init__()
-        if nonlinear is None:
-            self.nonlinear = nn.Identity()
-        else:
-            self.nonlinear = nonlinear
+        self.nonlinear = nn.Identity() if nonlinear is None else nonlinear
         if deploy:
             self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
                                   stride=stride, padding=padding, dilation=dilation, groups=groups, bias=True)
@@ -2769,11 +2747,7 @@ class OREPA_3x3_RepConv(nn.Module):
         super(OREPA_3x3_RepConv, self).__init__()
         self.deploy = deploy
 
-        if nonlinear is None:
-            self.nonlinear = nn.Identity()
-        else:
-            self.nonlinear = nonlinear
-
+        self.nonlinear = nn.Identity() if nonlinear is None else nonlinear
         self.kernel_size = kernel_size
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -2791,19 +2765,18 @@ class OREPA_3x3_RepConv(nn.Module):
         nn.init.kaiming_uniform_(self.weight_rbr_origin, a=math.sqrt(1.0))
         self.branch_counter += 1
 
-        if groups < out_channels:
-            self.weight_rbr_avg_conv = nn.Parameter(torch.Tensor(out_channels, int(in_channels / self.groups), 1, 1))
-            self.weight_rbr_pfir_conv = nn.Parameter(torch.Tensor(out_channels, int(in_channels / self.groups), 1, 1))
-            nn.init.kaiming_uniform_(self.weight_rbr_avg_conv, a=1.0)
-            nn.init.kaiming_uniform_(self.weight_rbr_pfir_conv, a=1.0)
-            self.weight_rbr_avg_conv.data
-            self.weight_rbr_pfir_conv.data
-            self.register_buffer('weight_rbr_avg_avg',
-                                 torch.ones(kernel_size, kernel_size).mul(1.0 / kernel_size / kernel_size))
-            self.branch_counter += 1
-
-        else:
+        if groups >= out_channels:
             raise NotImplementedError
+        self.weight_rbr_avg_conv = nn.Parameter(torch.Tensor(out_channels, int(in_channels / self.groups), 1, 1))
+        self.weight_rbr_pfir_conv = nn.Parameter(torch.Tensor(out_channels, int(in_channels / self.groups), 1, 1))
+        nn.init.kaiming_uniform_(self.weight_rbr_avg_conv, a=1.0)
+        nn.init.kaiming_uniform_(self.weight_rbr_pfir_conv, a=1.0)
+        self.weight_rbr_avg_conv.data
+        self.weight_rbr_pfir_conv.data
+        self.register_buffer('weight_rbr_avg_avg',
+                             torch.ones(kernel_size, kernel_size).mul(1.0 / kernel_size / kernel_size))
+        self.branch_counter += 1
+
         self.branch_counter += 1
 
         if internal_channels_1x1_3x3 is None:
@@ -2898,9 +2871,13 @@ class OREPA_3x3_RepConv(nn.Module):
         weight_rbr_gconv = self.dwsc2full(self.weight_rbr_gconv_dw, self.weight_rbr_gconv_pw, self.in_channels)
         weight_rbr_gconv = torch.einsum('oihw,o->oihw', weight_rbr_gconv, self.vector[4, :])
 
-        weight = weight_rbr_origin + weight_rbr_avg + weight_rbr_1x1_kxk + weight_rbr_pfir + weight_rbr_gconv
-
-        return weight
+        return (
+            weight_rbr_origin
+            + weight_rbr_avg
+            + weight_rbr_1x1_kxk
+            + weight_rbr_pfir
+            + weight_rbr_gconv
+        )
 
     def dwsc2full(self, weight_dw, weight_pw, groups):
 
@@ -2941,11 +2918,7 @@ class RepConv_OREPA(nn.Module):
 
         padding_11 = padding - k // 2
 
-        if nonlinear is None:
-            self.nonlinearity = nn.Identity()
-        else:
-            self.nonlinearity = nonlinear
-
+        self.nonlinearity = nn.Identity() if nonlinear is None else nonlinear
         if use_se:
             self.se = SEBlock(self.out_channels, internal_neurons=self.out_channels // 16)
         else:
@@ -2970,11 +2943,7 @@ class RepConv_OREPA(nn.Module):
         if hasattr(self, 'rbr_reparam'):
             return self.nonlinearity(self.se(self.rbr_reparam(inputs)))
 
-        if self.rbr_identity is None:
-            id_out = 0
-        else:
-            id_out = self.rbr_identity(inputs)
-
+        id_out = 0 if self.rbr_identity is None else self.rbr_identity(inputs)
         out1 = self.rbr_dense(inputs)
         out2 = self.rbr_1x1(inputs)
         out3 = id_out
@@ -3055,7 +3024,7 @@ class RepConv_OREPA(nn.Module):
     def switch_to_deploy(self):
         if hasattr(self, 'rbr_reparam'):
             return
-        print(f"RepConv_OREPA.switch_to_deploy")
+        print("RepConv_OREPA.switch_to_deploy")
         kernel, bias = self.get_equivalent_kernel_bias()
         self.rbr_reparam = nn.Conv2d(in_channels=self.rbr_dense.in_channels, out_channels=self.rbr_dense.out_channels,
                                      kernel_size=self.rbr_dense.kernel_size, stride=self.rbr_dense.stride,
@@ -3162,10 +3131,7 @@ class WindowAttention_v2(nn.Module):
             nW = mask.shape[0]
             attn = attn.view(B_ // nW, nW, self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
             attn = attn.view(-1, self.num_heads, N, N)
-            attn = self.softmax(attn)
-        else:
-            attn = self.softmax(attn)
-
+        attn = self.softmax(attn)
         attn = self.attn_drop(attn)
 
         try:
@@ -3217,8 +3183,11 @@ class Mlp_v2(nn.Module):
 def window_partition_v2(x, window_size):
     B, H, W, C = x.shape
     x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
-    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
-    return windows
+    return (
+        x.permute(0, 1, 3, 2, 4, 5)
+        .contiguous()
+        .view(-1, window_size, window_size, C)
+    )
 
 
 def window_reverse_v2(windows, window_size, H, W):
@@ -3275,7 +3244,9 @@ class SwinTransformerLayer_v2(nn.Module):
         mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, -100.0).masked_fill(
+            attn_mask == 0, 0.0
+        )
 
         return attn_mask
 
@@ -3604,8 +3575,7 @@ class LC_SEModule(nn.Module):
         x = self.conv2(x)
         # x = self.hardsigmoid(x)
         x = self.SiLU(x)
-        out = identity * x
-        return out
+        return identity * x
 
 
 class LC_Block(nn.Module):
@@ -3729,11 +3699,7 @@ class RepVGGBlock(nn.Module):
         if hasattr(self, 'rbr_reparam'):
             return self.nonlinearity(self.se(self.rbr_reparam(inputs)))
 
-        if self.rbr_identity is None:
-            id_out = 0
-        else:
-            id_out = self.rbr_identity(inputs)
-
+        id_out = 0 if self.rbr_identity is None else self.rbr_identity(inputs)
         return self.nonlinearity(self.se(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out))
 
     def get_equivalent_kernel_bias(self):

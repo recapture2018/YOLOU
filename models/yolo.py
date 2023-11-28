@@ -62,7 +62,7 @@ class Model(nn.Module):
 
         # Build strides, anchors
         m = self.model[-1]  # Detect()
-        if isinstance(m, Detect) or isinstance(m, ASFF_Detect) or isinstance(m, Decoupled_Detect):
+        if isinstance(m, (Detect, ASFF_Detect, Decoupled_Detect)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
             m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
@@ -178,15 +178,14 @@ class Model(nn.Module):
         return y
 
     def _profile_one_layer(self, m, x, dt):
-        c = isinstance(m, Detect) or isinstance(m, ASFF_Detect) or isinstance(m,
-                                                                              Decoupled_Detect)  # is final layer, copy input as inplace fix
+        c = isinstance(m, (Detect, ASFF_Detect, Decoupled_Detect))
         o = thop.profile(m, inputs=(x.copy() if c else x,), verbose=False)[0] / 1E9 * 2 if thop else 0  # FLOPs
         t = time_sync()
         for _ in range(10):
             m(x.copy() if c else x)
         dt.append((time_sync() - t) * 100)
         if m == self.model[0]:
-            LOGGER.info(f"{'time (ms)':>10s} {'GFLOPs':>10s} {'params':>10s}  {'module'}")
+            LOGGER.info(f"{'time (ms)':>10s} {'GFLOPs':>10s} {'params':>10s}  module")
         LOGGER.info(f'{dt[-1]:10.2f} {o:10.2f} {m.np:10.0f}  {m.type}')
         if c:
             LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
@@ -261,7 +260,7 @@ class Model(nn.Module):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
-        if isinstance(m, Detect) or isinstance(m, ASFF_Detect) or isinstance(m, Decoupled_Detect):
+        if isinstance(m, (Detect, ASFF_Detect, Decoupled_Detect)):
             m.stride = fn(m.stride)
             m.grid = list(map(fn, m.grid))
             if isinstance(m.anchor_grid, list):
@@ -318,11 +317,11 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:
-            c2 = sum([ch[x] for x in f])
+            c2 = sum(ch[x] for x in f)
         elif m is ADD:
-            c2 = sum([ch[x] for x in f]) // 2
+            c2 = sum(ch[x] for x in f) // 2
         elif m is Concat_bifpn:
-            c2 = max([ch[x] for x in f])
+            c2 = max(ch[x] for x in f)
         elif m is Shortcut:
             c2 = ch[f[0]]
         elif m is Foldcut:
@@ -356,7 +355,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             c2 = ch[f]
         m_ = nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args)  # module
         t = str(m)[8:-2].replace('__main__.', '')  # module type
-        np = sum([x.numel() for x in m_.parameters()])  # number params
+        np = sum(x.numel() for x in m_.parameters())
         m_.i, m_.f, m_.type, m_.np = i, f, t, np  # attach index, 'from' index, type, number params
         LOGGER.info(f'{i:>3}{str(f):>18}{n_:>3}{np:10.0f}  {t:<40}{str(args):<30}')  # print
         save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
@@ -385,8 +384,8 @@ if __name__ == '__main__':
     im = torch.rand(opt.batch_size, 3, 640, 640).to(device)
     model = Model(opt.cfg).to(device)
     flops, params = profile(model, inputs=(im,))
-    print('FLOPs = ' + str(flops / 1000 ** 3) + 'G')
-    print('Params = ' + str(params / 1000 ** 2) + 'M')
+    print(f'FLOPs = {str(flops / 1000**3)}G')
+    print(f'Params = {str(params / 1000**2)}M')
 
     # y = model(im)
     # for y_ in y:

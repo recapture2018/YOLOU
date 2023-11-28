@@ -123,42 +123,122 @@ class Detectv6(nn.Module):
 
 
 def build_effidehead_layer(channels_list, num_anchors, num_classes):
-    head_layers = nn.Sequential(
+    return nn.Sequential(
         # stem0
-        Conv(in_channels=channels_list[0], out_channels=channels_list[0], kernel_size=1, stride=1),
+        Conv(
+            in_channels=channels_list[0],
+            out_channels=channels_list[0],
+            kernel_size=1,
+            stride=1,
+        ),
         # cls_conv0
-        Conv(in_channels=channels_list[0], out_channels=channels_list[0], kernel_size=3, stride=1),
+        Conv(
+            in_channels=channels_list[0],
+            out_channels=channels_list[0],
+            kernel_size=3,
+            stride=1,
+        ),
         # reg_conv0
-        Conv(in_channels=channels_list[0], out_channels=channels_list[0], kernel_size=3, stride=1),
+        Conv(
+            in_channels=channels_list[0],
+            out_channels=channels_list[0],
+            kernel_size=3,
+            stride=1,
+        ),
         # cls_pred0
-        nn.Conv2d(in_channels=channels_list[0], out_channels=num_classes * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[0],
+            out_channels=num_classes * num_anchors,
+            kernel_size=1,
+        ),
         # reg_pred0
-        nn.Conv2d(in_channels=channels_list[0], out_channels=4 * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[0],
+            out_channels=4 * num_anchors,
+            kernel_size=1,
+        ),
         # obj_pred0
-        nn.Conv2d(in_channels=channels_list[0], out_channels=1 * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[0],
+            out_channels=1 * num_anchors,
+            kernel_size=1,
+        ),
         # stem1
-        Conv(in_channels=channels_list[1], out_channels=channels_list[1], kernel_size=1, stride=1),
+        Conv(
+            in_channels=channels_list[1],
+            out_channels=channels_list[1],
+            kernel_size=1,
+            stride=1,
+        ),
         # cls_conv1
-        Conv(in_channels=channels_list[1], out_channels=channels_list[1], kernel_size=3, stride=1),
+        Conv(
+            in_channels=channels_list[1],
+            out_channels=channels_list[1],
+            kernel_size=3,
+            stride=1,
+        ),
         # reg_conv1
-        Conv(in_channels=channels_list[1], out_channels=channels_list[1], kernel_size=3, stride=1),
+        Conv(
+            in_channels=channels_list[1],
+            out_channels=channels_list[1],
+            kernel_size=3,
+            stride=1,
+        ),
         # cls_pred1
-        nn.Conv2d(in_channels=channels_list[1], out_channels=num_classes * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[1],
+            out_channels=num_classes * num_anchors,
+            kernel_size=1,
+        ),
         # reg_pred1
-        nn.Conv2d(in_channels=channels_list[1], out_channels=4 * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[1],
+            out_channels=4 * num_anchors,
+            kernel_size=1,
+        ),
         # obj_pred1
-        nn.Conv2d(in_channels=channels_list[1], out_channels=1 * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[1],
+            out_channels=1 * num_anchors,
+            kernel_size=1,
+        ),
         # stem2
-        Conv(in_channels=channels_list[2], out_channels=channels_list[2], kernel_size=1, stride=1),
+        Conv(
+            in_channels=channels_list[2],
+            out_channels=channels_list[2],
+            kernel_size=1,
+            stride=1,
+        ),
         # cls_conv2
-        Conv(in_channels=channels_list[2], out_channels=channels_list[2], kernel_size=3, stride=1),
+        Conv(
+            in_channels=channels_list[2],
+            out_channels=channels_list[2],
+            kernel_size=3,
+            stride=1,
+        ),
         # reg_conv2
-        Conv(in_channels=channels_list[2], out_channels=channels_list[2], kernel_size=3, stride=1),
+        Conv(
+            in_channels=channels_list[2],
+            out_channels=channels_list[2],
+            kernel_size=3,
+            stride=1,
+        ),
         # cls_pred2
-        nn.Conv2d(in_channels=channels_list[2], out_channels=num_classes * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[2],
+            out_channels=num_classes * num_anchors,
+            kernel_size=1,
+        ),
         # reg_pred2
-        nn.Conv2d(in_channels=channels_list[2], out_channels=4 * num_anchors, kernel_size=1),
+        nn.Conv2d(
+            in_channels=channels_list[2],
+            out_channels=4 * num_anchors,
+            kernel_size=1,
+        ),
         # obj_pred2
-        nn.Conv2d(in_channels=channels_list[2], out_channels=1 * num_anchors, kernel_size=1)
+        nn.Conv2d(
+            in_channels=channels_list[2],
+            out_channels=1 * num_anchors,
+            kernel_size=1,
+        ),
     )
-    return head_layers

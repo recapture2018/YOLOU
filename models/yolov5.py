@@ -156,9 +156,8 @@ class ASFF_Detect(nn.Module):  # add ASFFV5 layer and Rfb
 
     def forward(self, x):
         z = []  # inference output
-        result = []
+        result = [self.l2_fusion(x)]
 
-        result.append(self.l2_fusion(x))
         result.append(self.l1_fusion(x))
         result.append(self.l0_fusion(x))
         x = result

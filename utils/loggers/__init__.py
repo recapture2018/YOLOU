@@ -105,7 +105,12 @@ class Loggers():
                 if not self.opt.sync_bn:  # --sync known issue https://github.com/ultralytics/yolov5/issues/3754
                     with warnings.catch_warnings():
                         warnings.simplefilter('ignore')  # suppress jit trace warning
-                        self.tb.add_graph(torch.jit.trace(de_parallel(model), imgs[0:1], strict=False), [])
+                        self.tb.add_graph(
+                            torch.jit.trace(
+                                de_parallel(model), imgs[:1], strict=False
+                            ),
+                            [],
+                        )
             if ni < 3:
                 f = self.save_dir / f'train_batch{ni}.jpg'  # filename
                 plot_images(imgs, targets, paths, f)
@@ -131,7 +136,7 @@ class Loggers():
 
     def on_fit_epoch_end(self, vals, epoch, best_fitness, fi):
         # Callback runs at the end of each fit (train+val) epoch
-        x = {k: v for k, v in zip(self.keys, vals)}  # dict
+        x = dict(zip(self.keys, vals))
         if self.csv:
             file = self.save_dir / 'results.csv'
             n = len(x) + 1  # number of cols
@@ -152,9 +157,8 @@ class Loggers():
             self.wandb.end_epoch(best_result=best_fitness == fi)
 
     def on_model_save(self, last, epoch, final_epoch, best_fitness, fi):
-        # Callback runs on model save event
-        if self.wandb:
-            if ((epoch + 1) % self.opt.save_period == 0 and not final_epoch) and self.opt.save_period != -1:
+        if ((epoch + 1) % self.opt.save_period == 0 and not final_epoch) and self.opt.save_period != -1:
+            if self.wandb:
                 self.wandb.log_model(last.parent, self.opt, epoch, fi, best_model=best_fitness == fi)
 
     def on_train_end(self, last, best, plots, epoch, results):
@@ -169,7 +173,7 @@ class Loggers():
                 self.tb.add_image(f.stem, cv2.imread(str(f))[..., ::-1], epoch, dataformats='HWC')
 
         if self.wandb:
-            self.wandb.log({k: v for k, v in zip(self.keys[3:10], results)})  # log yolox-lite-g.pt val results
+            self.wandb.log(dict(zip(self.keys[3:10], results)))
             self.wandb.log({"Results": [wandb.Image(str(f), caption=f.name) for f in files]})
             # Calling wandb.log. TODO: Refactor this into WandbLogger.log_model
             if not self.opt.evolve:
